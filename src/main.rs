@@ -1,3 +1,4 @@
+use askama::Template;
 use clap::Parser;
 use inquire::{Confirm, CustomType, Select, Text};
 use std::{
@@ -32,6 +33,54 @@ struct GeneratorConfig {
     motors: Vec<MotorConfig>,
 }
 
+#[derive(Debug)]
+struct MotorTemplate {
+    field_base: String,
+    constant_base: String,
+    method_suffix: String,
+    can_id: i32,
+    inverted_value: &'static str,
+}
+
+#[derive(Template)]
+#[template(path = "constants.java.askama")]
+struct ConstantsTemplate<'a> {
+    package: &'a str,
+    constants_class: &'a str,
+    motors: &'a [MotorTemplate],
+}
+
+#[derive(Template)]
+#[template(path = "io_interface.java.askama")]
+struct IoInterfaceTemplate<'a> {
+    package: &'a str,
+    io_interface: &'a str,
+    io_inputs: &'a str,
+    motors: &'a [MotorTemplate],
+}
+
+#[derive(Template)]
+#[template(path = "io_impl.java.askama")]
+struct IoImplTemplate<'a> {
+    package: &'a str,
+    io_impl: &'a str,
+    io_interface: &'a str,
+    io_inputs: &'a str,
+    constants_class: &'a str,
+    neutral_mode_value: &'a str,
+    motors: &'a [MotorTemplate],
+}
+
+#[derive(Template)]
+#[template(path = "subsystem.java.askama")]
+struct SubsystemTemplate<'a> {
+    package: &'a str,
+    subsystem: &'a str,
+    io_interface: &'a str,
+    io_inputs_auto: String,
+    motors: &'a [MotorTemplate],
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let mut config = prompt_config()?;
@@ -50,20 +99,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let io_inputs = format!("{}IOInputs", config.subsystem);
     let constants_class = format!("{}Constants", config.subsystem);
 
+    let template_motors = to_template_motors(&config.motors);
     let files = vec![
         (
             subsystem_dir.join(format!("{constants_class}.java")),
-            render_constants(&package, &constants_class, &config.motors),
+            render_constants(&package, &constants_class, &template_motors)?,
         ),
         (
             subsystem_dir.join(format!("{io_interface}.java")),
-            render_io_interface(
-                &package,
-                &io_interface,
-                &io_inputs,
-                &constants_class,
-                &config.motors,
-            ),
+            render_io_interface(&package, &io_interface, &io_inputs, &template_motors)?,
         ),
         (
             subsystem_dir.join(format!("{io_impl}.java")),
@@ -74,12 +118,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &io_inputs,
                 &constants_class,
                 &config.neutral_mode,
-                &config.motors,
-            ),
+                &template_motors,
+            )?,
         ),
         (
             subsystem_dir.join(format!("{}.java", config.subsystem)),
-            render_subsystem(&package, &config.subsystem, &io_interface, &config.motors),
+            render_subsystem(&package, &config.subsystem, &io_interface, &template_motors)?,
         ),
     ];
 
@@ -285,75 +329,49 @@ fn upper_first(value: &str) -> String {
     }
 }
 
-fn render_constants(package: &str, constants_class: &str, motors: &[MotorConfig]) -> String {
-    let mut motor_constants = String::new();
-    for motor in motors {
-        motor_constants.push_str(&format!(
-            "  public static final int {}_MOTOR_ID = {};\n",
-            motor.constant_base, motor.can_id
-        ));
+fn to_template_motors(motors: &[MotorConfig]) -> Vec<MotorTemplate> {
+    motors
+        .iter()
+        .map(|motor| MotorTemplate {
+            field_base: motor.field_base.clone(),
+            constant_base: motor.constant_base.clone(),
+            method_suffix: upper_first(&motor.field_base),
+            can_id: motor.can_id,
+            inverted_value: if motor.inverted {
+                "InvertedValue.Clockwise_Positive"
+            } else {
+                "InvertedValue.CounterClockwise_Positive"
+            },
+        })
+        .collect()
+}
+
+fn render_constants(
+    package: &str,
+    constants_class: &str,
+    motors: &[MotorTemplate],
+) -> Result<String, askama::Error> {
+    ConstantsTemplate {
+        package,
+        constants_class,
+        motors,
     }
-
-    format!(
-        "package {package};
-
-public class {constants_class} {{
-
-{motor_constants}}}
-"
-    )
+    .render()
 }
 
 fn render_io_interface(
     package: &str,
     io_interface: &str,
     io_inputs: &str,
-    _constants_class: &str,
-    motors: &[MotorConfig],
-) -> String {
-    let mut input_fields = String::new();
-    for motor in motors {
-        let f = &motor.field_base;
-        input_fields.push_str(&format!("    public double {f}PositionRot = 0.0;\n"));
-        input_fields.push_str(&format!("    public double {f}VelocityRps = 0.0;\n"));
-        input_fields.push_str(&format!("    public double {f}StatorCurrentAmps = 0.0;\n"));
-        input_fields.push_str(&format!("    public double {f}SupplyCurrentAmps = 0.0;\n"));
-        input_fields.push_str(&format!("    public double {f}AppliedVolts = 0.0;\n"));
+    motors: &[MotorTemplate],
+) -> Result<String, askama::Error> {
+    IoInterfaceTemplate {
+        package,
+        io_interface,
+        io_inputs,
+        motors,
     }
-
-    let mut speed_methods = String::new();
-    let mut stop_calls = String::new();
-    for motor in motors {
-        let method_suffix = upper_first(&motor.field_base);
-        speed_methods.push_str(&format!(
-            "  public void set{method_suffix}SpeedRaw(double speed);\n\n"
-        ));
-        speed_methods.push_str(&format!(
-            "  public void set{method_suffix}Control(ControlRequest request);\n\n"
-        ));
-        stop_calls.push_str(&format!("    set{method_suffix}SpeedRaw(0.0);\n"));
-    }
-
-    format!(
-        "package {package};
-
-import org.littletonrobotics.junction.AutoLog;
-import com.ctre.phoenix6.controls.ControlRequest;
-
-public interface {io_interface} {{
-  @AutoLog
-  public static class {io_inputs} {{
-{input_fields}  }}
-
-  public void updateInputs({io_inputs} inputs);
-
-{speed_methods}  public default void stop() {{
-{stop_calls}  }}
-
-  public default void close() {{}}
-}}
-"
-    )
+    .render()
 }
 
 fn render_io_impl(
@@ -363,149 +381,37 @@ fn render_io_impl(
     io_inputs: &str,
     constants_class: &str,
     neutral_mode: &str,
-    motors: &[MotorConfig],
-) -> String {
-    let mut motor_fields = String::new();
-    for motor in motors {
-        motor_fields.push_str(&format!(
-            "  private final TalonFX {}Motor = new TalonFX({constants_class}.{}_MOTOR_ID, Constants.CANIVORE_SUB);\n",
-            motor.field_base, motor.constant_base
-        ));
+    motors: &[MotorTemplate],
+) -> Result<String, askama::Error> {
+    let neutral_mode_value = if neutral_mode == "Brake" {
+        "NeutralModeValue.Brake"
+    } else {
+        "NeutralModeValue.Coast"
+    };
+    IoImplTemplate {
+        package,
+        io_impl,
+        io_interface,
+        io_inputs,
+        constants_class,
+        neutral_mode_value,
+        motors,
     }
-
-    let mut config_calls = String::new();
-    for motor in motors {
-        let inverted = if motor.inverted {
-            "InvertedValue.Clockwise_Positive"
-        } else {
-            "InvertedValue.CounterClockwise_Positive"
-        };
-        let neutral = if neutral_mode == "Brake" {
-            "NeutralModeValue.Brake"
-        } else {
-            "NeutralModeValue.Coast"
-        };
-        config_calls.push_str(&format!(
-            "    {}Motor.getConfigurator().apply(config);\n",
-            motor.field_base
-        ));
-        config_calls.push_str(&format!(
-            "    {}Motor.getConfigurator().apply(new MotorOutputConfigs().withInverted({inverted}).withNeutralMode({neutral}));\n",
-            motor.field_base
-        ));
-    }
-
-    let mut input_assignments = String::new();
-    for motor in motors {
-        let f = &motor.field_base;
-        input_assignments.push_str(&format!(
-            "    inputs.{f}PositionRot = {f}Motor.getPosition().getValueAsDouble();\n"
-        ));
-        input_assignments.push_str(&format!(
-            "    inputs.{f}VelocityRps = {f}Motor.getVelocity().getValueAsDouble();\n"
-        ));
-        input_assignments.push_str(&format!(
-            "    inputs.{f}StatorCurrentAmps = {f}Motor.getStatorCurrent().getValueAsDouble();\n"
-        ));
-        input_assignments.push_str(&format!(
-            "    inputs.{f}SupplyCurrentAmps = {f}Motor.getSupplyCurrent().getValueAsDouble();\n"
-        ));
-        input_assignments.push_str(&format!(
-            "    inputs.{f}AppliedVolts = {f}Motor.getMotorVoltage().getValueAsDouble();\n"
-        ));
-    }
-
-    let mut raw_speed_methods = String::new();
-    for motor in motors {
-        let method_suffix = upper_first(&motor.field_base);
-        raw_speed_methods.push_str(&format!(
-            "  @Override\n  public void set{method_suffix}SpeedRaw(double speed) {{\n    {}Motor.set(speed);\n  }}\n\n",
-            motor.field_base
-        ));
-        raw_speed_methods.push_str(&format!(
-            "  @Override\n  public void set{method_suffix}Control(ControlRequest request) {{\n    {}Motor.setControl(request);\n  }}\n\n",
-            motor.field_base
-        ));
-    }
-
-    let mut close_calls = String::new();
-    for motor in motors {
-        close_calls.push_str(&format!("    {}Motor.close();\n", motor.field_base));
-    }
-
-    format!(
-        "package {package};
-
-import com.ctre.phoenix6.configs.MotorOutputConfigs;
-import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.controls.ControlRequest;
-import com.ctre.phoenix6.hardware.TalonFX;
-import com.ctre.phoenix6.signals.InvertedValue;
-import com.ctre.phoenix6.signals.NeutralModeValue;
-import frc.robot.constants.Constants;
-
-public class {io_impl} implements {io_interface} {{
-{motor_fields}
-  public {io_impl}() {{
-    TalonFXConfiguration config = new TalonFXConfiguration();
-    // TODO: tune PID, current limits, and motion magic limits
-{config_calls}  }}
-
-  @Override
-  public void updateInputs({io_inputs} inputs) {{
-{input_assignments}  }}
-
-{raw_speed_methods}  @Override
-  public void close() {{
-{close_calls}  }}
-}}
-"
-    )
+    .render()
 }
 
 fn render_subsystem(
     package: &str,
     subsystem: &str,
     io_interface: &str,
-    motors: &[MotorConfig],
-) -> String {
-    let io_inputs_auto = format!("{subsystem}IOInputsAutoLogged");
-    let mut methods = String::new();
-    for motor in motors {
-        let method_suffix = upper_first(&motor.field_base);
-        methods.push_str(&format!(
-            "  public void set{method_suffix}SpeedRaw(double speed) {{\n    io.set{method_suffix}SpeedRaw(speed);\n  }}\n\n"
-        ));
+    motors: &[MotorTemplate],
+) -> Result<String, askama::Error> {
+    SubsystemTemplate {
+        package,
+        subsystem,
+        io_interface,
+        io_inputs_auto: format!("{subsystem}IOInputsAutoLogged"),
+        motors,
     }
-    format!(
-        "package {package};
-
-import org.littletonrobotics.junction.Logger;
-
-import edu.wpi.first.wpilibj2.command.SubsystemBase;
-
-public class {subsystem} extends SubsystemBase {{
-  private final {io_interface} io;
-  private final {io_inputs_auto} inputs = new {io_inputs_auto}();
-
-  public {subsystem}({io_interface} io) {{
-    this.io = io;
-  }}
-
-  @Override
-  public void periodic() {{
-    io.updateInputs(inputs);
-    Logger.processInputs(\"{subsystem}\", inputs);
-  }}
-
-{methods}  public void stop() {{
-    io.stop();
-  }}
-
-  public void close() {{
-    io.close();
-  }}
-}}
-"
-    )
+    .render()
 }
