@@ -1,0 +1,36 @@
+package {{ package }};
+
+import org.littletonrobotics.junction.Logger;
+
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
+
+public class {{ subsystem }} extends SubsystemBase {
+  private final {{ io_interface }} io;
+  private final {{ io_inputs_auto }} inputs = new {{ io_inputs_auto }}();
+
+  public {{ subsystem }}({{ io_interface }} io) {
+    this.io = io;
+  }
+
+  @Override
+  public void periodic() {
+    io.updateInputs(inputs);
+    Logger.processInputs("{{ subsystem }}", inputs);
+  }
+
+{% for motor in motors %}  public void set{{ motor.method_suffix }}SpeedRaw(double speed) {
+    io.set{{ motor.method_suffix }}SpeedRaw(speed);
+  }
+
+  public void set{{ motor.method_suffix }}Control(ControlRequest request) {
+    io.set{{ motor.method_suffix }}Control(request);
+  }
+
+{% endfor %}  public void stop() {
+    io.stop();
+  }
+
+  public void close() {
+    io.close();
+  }
+}

@@ -1,0 +1,27 @@
+package {{ package }};
+
+import org.littletonrobotics.junction.AutoLog;
+import com.ctre.phoenix6.controls.ControlRequest;
+
+public interface {{ io_interface }} {
+  @AutoLog
+  public static class {{ io_inputs }} {
+{% for motor in motors %}    public double {{ motor.field_base }}PositionRot = 0.0;
+    public double {{ motor.field_base }}VelocityRps = 0.0;
+    public double {{ motor.field_base }}StatorCurrentAmps = 0.0;
+    public double {{ motor.field_base }}SupplyCurrentAmps = 0.0;
+    public double {{ motor.field_base }}AppliedVolts = 0.0;
+{% endfor %}  }
+
+  public void updateInputs({{ io_inputs }} inputs);
+
+{% for motor in motors %}  public void set{{ motor.method_suffix }}SpeedRaw(double speed);
+
+  public void set{{ motor.method_suffix }}Control(ControlRequest request);
+
+{% endfor %}  public default void stop() {
+{% for motor in motors %}    set{{ motor.method_suffix }}SpeedRaw(0.0);
+{% endfor %}  }
+
+  public default void close() {}
+}

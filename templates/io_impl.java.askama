@@ -1,0 +1,44 @@
+package {{ package }};
+
+import com.ctre.phoenix6.configs.MotorOutputConfigs;
+import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.controls.ControlRequest;
+import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.InvertedValue;
+import com.ctre.phoenix6.signals.NeutralModeValue;
+import frc.robot.constants.Constants;
+
+public class {{ io_impl }} implements {{ io_interface }} {
+{% for motor in motors %}  private final TalonFX {{ motor.field_base }}Motor = new TalonFX({{ constants_class }}.{{ motor.constant_base }}_MOTOR_ID, Constants.CANIVORE_SUB);
+{% endfor %}
+  public {{ io_impl }}() {
+    TalonFXConfiguration config = new TalonFXConfiguration();
+    // TODO: tune PID, current limits, and motion magic limits
+{% for motor in motors %}    {{ motor.field_base }}Motor.getConfigurator().apply(config);
+    {{ motor.field_base }}Motor.getConfigurator().apply(new MotorOutputConfigs().withInverted({{ motor.inverted_value }}).withNeutralMode({{ neutral_mode_value }}));
+{% endfor %}  }
+
+  @Override
+  public void updateInputs({{ io_inputs }} inputs) {
+{% for motor in motors %}    inputs.{{ motor.field_base }}PositionRot = {{ motor.field_base }}Motor.getPosition().getValueAsDouble();
+    inputs.{{ motor.field_base }}VelocityRps = {{ motor.field_base }}Motor.getVelocity().getValueAsDouble();
+    inputs.{{ motor.field_base }}StatorCurrentAmps = {{ motor.field_base }}Motor.getStatorCurrent().getValueAsDouble();
+    inputs.{{ motor.field_base }}SupplyCurrentAmps = {{ motor.field_base }}Motor.getSupplyCurrent().getValueAsDouble();
+    inputs.{{ motor.field_base }}AppliedVolts = {{ motor.field_base }}Motor.getMotorVoltage().getValueAsDouble();
+{% endfor %}  }
+
+{% for motor in motors %}  @Override
+  public void set{{ motor.method_suffix }}SpeedRaw(double speed) {
+    {{ motor.field_base }}Motor.set(speed);
+  }
+
+  @Override
+  public void set{{ motor.method_suffix }}Control(ControlRequest request) {
+    {{ motor.field_base }}Motor.setControl(request);
+  }
+
+{% endfor %}  @Override
+  public void close() {
+{% for motor in motors %}    {{ motor.field_base }}Motor.close();
+{% endfor %}  }
+}

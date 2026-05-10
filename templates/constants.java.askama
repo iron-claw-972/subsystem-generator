@@ -1,0 +1,6 @@
+package {{ package }};
+
+public class {{ constants_class }} {
+
+{% for motor in motors %}  public static final int {{ motor.constant_base }}_MOTOR_ID = {{ motor.can_id }};
+{% endfor %}}
