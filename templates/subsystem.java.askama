@@ -25,8 +25,4 @@ public class {{ subsystem }} extends SubsystemBase {
 {% endfor %}  public void stop() {
     io.stop();
   }
-
-  public void close() {
-    io.close();
-  }
 }

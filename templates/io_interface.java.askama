@@ -19,6 +19,4 @@ public interface {{ io_interface }} {
 {% endfor %}  public default void stop() {
 {% for motor in motors %}    set{{ motor.method_suffix }}SpeedRaw(0.0);
 {% endfor %}  }
-
-  public default void close() {}
 }

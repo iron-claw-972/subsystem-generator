@@ -31,8 +31,5 @@ public class {{ io_impl }} implements {{ io_interface }} {
     {{ motor.field_base }}Motor.setThrottle(speed);
   }
 
-{% endfor %}  @Override
-  public void close() {
-{% for motor in motors %}    {{ motor.field_base }}Motor.close();
-{% endfor %}  }
+{% endfor %}
 }

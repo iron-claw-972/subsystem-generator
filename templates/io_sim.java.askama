@@ -8,7 +8,7 @@ import org.wpilib.math.system.Models;
 public class {{ io_impl }} implements {{ io_interface }} {
 {% for motor in motors %}  private final DCMotorSim {{ motor.field_base }}MotorSim =
       new DCMotorSim(
-          Models.singleJointedArmFromPhysicalConstants(DCMotor.getFalcon500(1), 0.001, 1.0),
+          Models.singleJointedArmFromPhysicalConstants(DCMotor.getFalcon500(1), 0.001, 1.0), //TODO get correct MOI from cadders and gear ratio
           DCMotor.getFalcon500(1));
 
 {% endfor %}
@@ -29,6 +29,5 @@ public class {{ io_impl }} implements {{ io_interface }} {
     {{ motor.field_base }}MotorSim.setInputVoltage({{ motor.inversion_sign }}speed * 12.0);
   }
 
-{% endfor %}  @Override
-  public void close() {}
+{% endfor %}
 }
