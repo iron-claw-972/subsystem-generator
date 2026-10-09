@@ -2,7 +2,6 @@ package {{ package }};
 
 import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.controls.ControlRequest;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
@@ -29,12 +28,7 @@ public class {{ io_impl }} implements {{ io_interface }} {
 
 {% for motor in motors %}  @Override
   public void set{{ motor.method_suffix }}SpeedRaw(double speed) {
-    {{ motor.field_base }}Motor.set(speed);
-  }
-
-  @Override
-  public void set{{ motor.method_suffix }}Control(ControlRequest request) {
-    {{ motor.field_base }}Motor.setControl(request);
+    {{ motor.field_base }}Motor.setThrottle(speed);
   }
 
 {% endfor %}  @Override

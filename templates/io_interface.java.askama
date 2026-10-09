@@ -1,7 +1,6 @@
 package {{ package }};
 
 import org.littletonrobotics.junction.AutoLog;
-import com.ctre.phoenix6.controls.ControlRequest;
 
 public interface {{ io_interface }} {
   @AutoLog
@@ -16,8 +15,6 @@ public interface {{ io_interface }} {
   public void updateInputs({{ io_inputs }} inputs);
 
 {% for motor in motors %}  public void set{{ motor.method_suffix }}SpeedRaw(double speed);
-
-  public void set{{ motor.method_suffix }}Control(ControlRequest request);
 
 {% endfor %}  public default void stop() {
 {% for motor in motors %}    set{{ motor.method_suffix }}SpeedRaw(0.0);

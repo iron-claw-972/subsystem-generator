@@ -2,7 +2,7 @@ package {{ package }};
 
 import org.littletonrobotics.junction.Logger;
 
-import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import org.wpilib.command2.SubsystemBase;
 
 public class {{ subsystem }} extends SubsystemBase {
   private final {{ io_interface }} io;
@@ -20,10 +20,6 @@ public class {{ subsystem }} extends SubsystemBase {
 
 {% for motor in motors %}  public void set{{ motor.method_suffix }}SpeedRaw(double speed) {
     io.set{{ motor.method_suffix }}SpeedRaw(speed);
-  }
-
-  public void set{{ motor.method_suffix }}Control(ControlRequest request) {
-    io.set{{ motor.method_suffix }}Control(request);
   }
 
 {% endfor %}  public void stop() {

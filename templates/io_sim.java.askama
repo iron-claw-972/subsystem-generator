@@ -1,0 +1,34 @@
+package {{ package }};
+
+import org.wpilib.math.system.DCMotor;
+import org.wpilib.math.util.Units;
+import org.wpilib.simulation.DCMotorSim;
+import org.wpilib.math.system.Models;
+
+public class {{ io_impl }} implements {{ io_interface }} {
+{% for motor in motors %}  private final DCMotorSim {{ motor.field_base }}MotorSim =
+      new DCMotorSim(
+          Models.singleJointedArmFromPhysicalConstants(DCMotor.getFalcon500(1), 0.001, 1.0),
+          DCMotor.getFalcon500(1));
+
+{% endfor %}
+
+
+  @Override
+  public void updateInputs({{ io_inputs }} inputs) {
+{% for motor in motors %}    {{ motor.field_base }}MotorSim.update(0.02);
+    inputs.{{ motor.field_base }}PositionRot = Units.radiansToRotations({{ motor.field_base }}MotorSim.getAngularPosition());
+    inputs.{{ motor.field_base }}VelocityRps = Units.radiansToRotations({{ motor.field_base }}MotorSim.getAngularVelocity()) / 60.0;
+    inputs.{{ motor.field_base }}StatorCurrentAmps = {{ motor.field_base }}MotorSim.getCurrentDraw();
+    inputs.{{ motor.field_base }}SupplyCurrentAmps = {{ motor.field_base }}MotorSim.getCurrentDraw();
+    inputs.{{ motor.field_base }}AppliedVolts = {{ motor.field_base }}MotorSim.getInputVoltage();
+{% endfor %}  }
+
+{% for motor in motors %}  @Override
+  public void set{{ motor.method_suffix }}SpeedRaw(double speed) {
+    {{ motor.field_base }}MotorSim.setInputVoltage({{ motor.inversion_sign }}speed * 12.0);
+  }
+
+{% endfor %}  @Override
+  public void close() {}
+}

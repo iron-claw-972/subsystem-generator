@@ -40,6 +40,7 @@ struct MotorTemplate {
     method_suffix: String,
     can_id: i32,
     inverted_value: &'static str,
+    inversion_sign: &'static str,
 }
 
 #[derive(Template)]
@@ -72,6 +73,16 @@ struct IoImplTemplate<'a> {
 }
 
 #[derive(Template)]
+#[template(path = "io_sim.java.askama")]
+struct IoSimTemplate<'a> {
+    package: &'a str,
+    io_impl: &'a str,
+    io_interface: &'a str,
+    io_inputs: &'a str,
+    motors: &'a [MotorTemplate],
+}
+
+#[derive(Template)]
 #[template(path = "subsystem.java.askama")]
 struct SubsystemTemplate<'a> {
     package: &'a str,
@@ -96,6 +107,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let io_interface = format!("{}IO", config.subsystem);
     let io_impl = format!("{}IOTalonFX", config.subsystem);
+    let io_sim_impl = format!("{}IOSim", config.subsystem);
     let io_inputs = format!("{}IOInputs", config.subsystem);
     let constants_class = format!("{}Constants", config.subsystem);
 
@@ -118,6 +130,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &io_inputs,
                 &constants_class,
                 &config.neutral_mode,
+                &template_motors,
+            )?,
+        ),
+        (
+            subsystem_dir.join(format!("{io_sim_impl}.java")),
+            render_io_sim(
+                &package,
+                &io_sim_impl,
+                &io_interface,
+                &io_inputs,
                 &template_motors,
             )?,
         ),
@@ -342,6 +364,7 @@ fn to_template_motors(motors: &[MotorConfig]) -> Vec<MotorTemplate> {
             } else {
                 "InvertedValue.CounterClockwise_Positive"
             },
+            inversion_sign: if motor.inverted { "-" } else { "" },
         })
         .collect()
 }
@@ -395,6 +418,23 @@ fn render_io_impl(
         io_inputs,
         constants_class,
         neutral_mode_value,
+        motors,
+    }
+    .render()
+}
+
+fn render_io_sim(
+    package: &str,
+    io_impl: &str,
+    io_interface: &str,
+    io_inputs: &str,
+    motors: &[MotorTemplate],
+) -> Result<String, askama::Error> {
+    IoSimTemplate {
+        package,
+        io_impl,
+        io_interface,
+        io_inputs,
         motors,
     }
     .render()
